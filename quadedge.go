@@ -193,8 +193,8 @@ func TriArea(a, b, c *Point2D) float64 {
 
 func InCircle(a, b, c, d *Point2D) bool {
 	return (a.X*a.X+a.Y*a.Y)*TriArea(b, c, d)-
-		(b.X*b.X+b.Y*b.Y)*TriArea(a, c, d)-
-		(c.X*c.X+c.Y*c.Y)*TriArea(a, b, d)+
+		(b.X*b.X+b.Y*b.Y)*TriArea(a, c, d)+
+		(c.X*c.X+c.Y*c.Y)*TriArea(a, b, d)-
 		(d.X*d.X+d.Y*d.Y)*TriArea(a, b, c) > 0
 }
 
@@ -251,7 +251,12 @@ func Locate(x *Point2D, startingEdge *Edge) *Edge {
 	}
 }
 
+var debug bool = false
+
 func InsertSite(x *Point2D, startingEdge *Edge) {
+	if debug {
+		fmt.Printf("InsertSite %f,%f\n", x.X, x.Y)
+	}
 	e := Locate(x, startingEdge)
 	if *x == *e.Org() || *x == *e.Dest() {
 		return
@@ -263,9 +268,15 @@ func InsertSite(x *Point2D, startingEdge *Edge) {
 	base.SetOrg(e.Org())
 	base.SetDest(x)
 	Splice(base, e)
+	if debug {
+		draw(base, nextfile())
+	}
 	startingEdge = base
 	for {
 		base = Connect(e, base.Sym())
+		if debug {
+			draw(base, nextfile())
+		}
 		e = base.Oprev()
 		if *e.Lnext() == *startingEdge {
 			break
@@ -273,8 +284,16 @@ func InsertSite(x *Point2D, startingEdge *Edge) {
 	}
 	for {
 		t := e.Oprev()
-		if RightOf(t.Dest(), e) && InCircle(e.Org(), t.Dest(), e.Dest(), x) {
+		rightof := RightOf(t.Dest(), e)
+		if debug {
+			incircle := InCircle(e.Org(), t.Dest(), e.Dest(), x)
+			fmt.Printf("\n%v ==\nInCircle(%#v,\n         %#v,\n         %#v,\n         %#v)\n", incircle, e.Org(), t.Dest(), e.Dest(), x)
+		}
+		if rightof && InCircle(e.Org(), t.Dest(), e.Dest(), x) {
 			Swap(e)
+			if debug {
+				draw(e, nextfile())
+			}
 			e = e.Oprev()
 		} else if *e.Onext() == *startingEdge {
 			return
@@ -285,7 +304,6 @@ func InsertSite(x *Point2D, startingEdge *Edge) {
 }
 
 func (e *Edge) Edges() map[int]*Edge {
-	//	e.Print()
 	edgeSet := make(map[*QuadEdge]bool)
 	edgeIndex := make(map[int]*Edge)
 	edgeIndex[0] = e
@@ -400,13 +418,18 @@ func BoundingBox(e *Edge) (small, big *Point2D) {
 	return
 }
 
+var fileno int = 0
+func nextfile() string {
+	fileno++
+	return fmt.Sprintf("hello%02d.pdf", fileno)
+}
+
 func draw(e0 *Edge, file string) {
 	dest := draw2dpdf.NewPdf("L", "mm", "A4")
 	gc := draw2dpdf.NewGraphicContext(dest)
-	gc.SetLineWidth(1)
+	gc.SetLineWidth(0.1)
 	for _, e := range e0.Edges() {
-		r, g, b := uint8(rand.Intn(256)), uint8(rand.Intn(256)), uint8(rand.Intn(256))
-		gc.SetStrokeColor(color.RGBA{r, g, b, 0xff})
+		gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0xff, 0xff})
 		gc.MoveTo(e.Org().X, e.Org().Y)
 		gc.LineTo(e.Dest().X, e.Dest().Y)
 		gc.Stroke()
@@ -415,10 +438,13 @@ func draw(e0 *Edge, file string) {
 }
 
 func main() {
-	rand.Seed(5)
 	bigTri := Ngon(3, 1e4)
-	for i := 0; i < 3; i++ {
-		InsertSite(&Point2D{rand.Float64() * 150.0, rand.Float64() * 150.0}, bigTri)
+	for i := 0; i < 1000; i++ {
+		x, y := math.Sincos(2.0 * math.Pi * rand.Float64())
+		radius := rand.Float64() * 100.0
+		x, y =  radius * x, radius * y
+		x, y = x + 150.0, y + 105.0
+		InsertSite(&Point2D{x, y}, bigTri)
 	}
-	draw(bigTri, "hello1.pdf")
+	draw(bigTri, nextfile())
 }
