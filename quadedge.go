@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/llgcode/draw2d/draw2dimg"
-	"image"
+	"github.com/llgcode/draw2d/draw2dpdf"
+	//	"github.com/llgcode/draw2d/draw2dimg"
+	//	"image"
 	"image/color"
 	"math"
+	"math/rand"
 )
 
 /* Quad Edge data structure from section 4.1 (for when a single orientation is sufficient) of
@@ -114,6 +116,50 @@ func (e *Edge) SetDest(d *Point2D) {
 	e.Sym().SetOrg(d)
 }
 
+func Ngon(n int, radius float64) *Edge {
+	if n < 3 {
+		return nil
+	}
+	pts := make([]*Point2D, n)
+	for i := range pts {
+		x, y := math.Sincos(math.Pi * float64(2*i) / float64(n))
+		x, y = radius*x, radius*y
+		pts[i] = &Point2D{x, y}
+	}
+	return Polygon(pts)
+}
+
+func Rect(a, b, c, d *Point2D) *Edge {
+	return Polygon([]*Point2D{a, b, c, d})
+}
+
+func Triangle(a, b, c *Point2D) *Edge {
+	return Polygon([]*Point2D{a, b, c})
+}
+
+func Polygon(pts []*Point2D) *Edge {
+	n := len(pts)
+	if n < 3 {
+		return nil
+	}
+
+	e0 := MakeEdge()
+	e0.SetOrg(pts[0])
+	e0.SetDest(pts[1])
+
+	ePrev := e0
+	for i := 1; i < n; i++ {
+		e := MakeEdge()
+		e.SetOrg(pts[i])
+		e.SetDest(pts[(i+1)%n])
+		Splice(ePrev.Sym(), e)
+		ePrev = e
+	}
+
+	Splice(ePrev.Sym(), e0)
+	return e0
+}
+
 // Derived topological operators, p. 103
 func Connect(a, b *Edge) *Edge {
 	e := MakeEdge()
@@ -191,7 +237,7 @@ func OnEdge(x *Point2D, e *Edge) bool {
 func Locate(x *Point2D, startingEdge *Edge) *Edge {
 	e := startingEdge
 	for {
-		if x == e.Org() || x == e.Dest() {
+		if *x == *e.Org() || *x == *e.Dest() {
 			return e
 		} else if RightOf(x, e) {
 			e = e.Sym()
@@ -207,7 +253,7 @@ func Locate(x *Point2D, startingEdge *Edge) *Edge {
 
 func InsertSite(x *Point2D, startingEdge *Edge) {
 	e := Locate(x, startingEdge)
-	if x == e.Org() || x == e.Dest() {
+	if *x == *e.Org() || *x == *e.Dest() {
 		return
 	} else if OnEdge(x, e) {
 		e = e.Oprev()
@@ -221,7 +267,7 @@ func InsertSite(x *Point2D, startingEdge *Edge) {
 	for {
 		base = Connect(e, base.Sym())
 		e = base.Oprev()
-		if e.Lnext() == startingEdge {
+		if *e.Lnext() == *startingEdge {
 			break
 		}
 	}
@@ -230,7 +276,7 @@ func InsertSite(x *Point2D, startingEdge *Edge) {
 		if RightOf(t.Dest(), e) && InCircle(e.Org(), t.Dest(), e.Dest(), x) {
 			Swap(e)
 			e = e.Oprev()
-		} else if e.Onext() == startingEdge {
+		} else if *e.Onext() == *startingEdge {
 			return
 		} else {
 			e = e.Onext().Lprev()
@@ -239,12 +285,10 @@ func InsertSite(x *Point2D, startingEdge *Edge) {
 }
 
 func (e *Edge) Edges() map[int]*Edge {
-	fmt.Printf("Edges\n")
 	//	e.Print()
 	edgeSet := make(map[*QuadEdge]bool)
 	edgeIndex := make(map[int]*Edge)
 	edgeIndex[0] = e
-	fmt.Printf("Adding %v\n", e.Q)
 	edgeSet[e.Q] = true
 	inbound := func(e1 *Edge) {
 		if e1 == nil {
@@ -253,7 +297,6 @@ func (e *Edge) Edges() map[int]*Edge {
 		e2 := e1.Onext()
 		for e2 != nil && *e1 != *e2 {
 			if edgeSet[e2.Q] == false { // have not seen this edge yet
-				fmt.Printf("Adding %v\n", e2.Q)
 				edgeSet[e2.Q] = true
 				edgeIndex[len(edgeIndex)] = e2.Sym()
 			}
@@ -322,68 +365,60 @@ func (e *Edge) DotPrint() {
 	fmt.Printf("}\n")
 }
 
+func BoundingBox(e *Edge) (small, big *Point2D) {
+	if e == nil || e.Org() == nil || e.Dest() == nil {
+		return
+	}
+	small = &Point2D{e.Org().X, e.Org().Y}
+	big = &Point2D{e.Org().X, e.Org().Y}
+	min := func(a, b, c float64) float64 {
+		switch {
+		case a <= b && a <= c:
+			return a
+		case b <= a && b <= c:
+			return b
+		default:
+			return c
+		}
+	}
+	max := func(a, b, c float64) float64 {
+		switch {
+		case a >= b && a >= c:
+			return a
+		case b >= a && b >= c:
+			return b
+		default:
+			return c
+		}
+	}
+	for _, e1 := range e.Edges() {
+		small.X = min(small.X, e1.Org().X, e1.Dest().X)
+		small.Y = min(small.Y, e1.Org().Y, e1.Dest().Y)
+		big.X = max(big.X, e1.Org().X, e1.Dest().X)
+		big.Y = max(big.Y, e1.Org().Y, e1.Dest().Y)
+	}
+	return
+}
+
+func draw(e0 *Edge, file string) {
+	dest := draw2dpdf.NewPdf("L", "mm", "A4")
+	gc := draw2dpdf.NewGraphicContext(dest)
+	gc.SetLineWidth(1)
+	for _, e := range e0.Edges() {
+		r, g, b := uint8(rand.Intn(256)), uint8(rand.Intn(256)), uint8(rand.Intn(256))
+		gc.SetStrokeColor(color.RGBA{r, g, b, 0xff})
+		gc.MoveTo(e.Org().X, e.Org().Y)
+		gc.LineTo(e.Dest().X, e.Dest().Y)
+		gc.Stroke()
+	}
+	draw2dpdf.SaveToPdfFile(file, dest)
+}
+
 func main() {
-	fmt.Printf("Hello world\n")
-	e1 := MakeEdge()
-	e1.SetOrg(&Point2D{3, 5})
-	fmt.Printf("%v\n", *e1)
-	fmt.Printf("%v\n", e1.Q)
-	e2 := MakeEdge()
-	e2.SetOrg(&Point2D{100, 100})
-	Splice(e1, e2)
-	e1.Print()
-	e2.Print()
-	//	e2.SetOrg(&Point2D{100, 100})
-	//	e2.Print()
-	//	Connect(e1, e2)
-	//	e3.Print()
-	PrintEdges(e1.Edges())
-
-	fmt.Printf("Hello world\n")
-	a := MakeEdge().Rot()
-	a.DotPrint()
-	b := MakeEdge().Rot()
-	c := MakeEdge().Rot()
-	a.SetOrg(&Point2D{1, 1})
-	b.SetOrg(&Point2D{2, 2})
-	c.SetOrg(&Point2D{3, 3})
-	a.Print()
-	b.Print()
-	c.Print()
-	Splice(a, b)
-	Splice(b, c)
-	a.SetOrg(&Point2D{1, 1})
-	b.SetOrg(&Point2D{2, 2})
-	c.SetOrg(&Point2D{3, 3})
-	fmt.Printf("a: %v\n", a.Q)
-	fmt.Printf("b: %v\n", b.Q)
-	fmt.Printf("c: %v\n", c.Q)
-	PrintEdges(a.Edges())
-	a.DotPrint()
-	fmt.Printf("Hello world\n")
-
-	i := 4
-	fmt.Printf("i: %x, &i: %x\n", i, &i)
-	fmt.Printf("&a: %x\n", &a.Q)
-	q := a.Q
-	fmt.Printf("q: %p\n", q)
-
-	// Initialize the graphic context on an RGBA image
-	dest := image.NewRGBA(image.Rect(0, 0, 297, 210.0))
-	gc := draw2dimg.NewGraphicContext(dest)
-
-	// Set some properties
-	gc.SetFillColor(color.RGBA{0x44, 0xff, 0x44, 0xff})
-	gc.SetStrokeColor(color.RGBA{0x44, 0x44, 0x44, 0xff})
-	gc.SetLineWidth(5)
-
-	// Draw a closed shape
-	gc.MoveTo(10, 10) // should always be called first for a new path
-	gc.LineTo(100, 50)
-	gc.QuadCurveTo(100, 10, 10, 10)
-	gc.Close()
-	gc.FillStroke()
-
-	// Save to file
-	draw2dimg.SaveToPngFile("hello.png", dest)
+	rand.Seed(5)
+	bigTri := Ngon(3, 1e4)
+	for i := 0; i < 3; i++ {
+		InsertSite(&Point2D{rand.Float64() * 150.0, rand.Float64() * 150.0}, bigTri)
+	}
+	draw(bigTri, "hello1.pdf")
 }
