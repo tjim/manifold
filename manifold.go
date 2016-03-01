@@ -1,88 +1,72 @@
 package main
 
 import (
-	"fmt"
 	. "./quadedge"
-	"github.com/llgcode/draw2d/draw2dpdf"
-	"image/color"
+	"fmt"
+	"github.com/ajstarks/svgo/float"
 	"math"
+	//	"log"
+	//	"net/http"
+	"os"
 )
 
 var fileno int = 0
 
 func nextfile() string {
 	fileno++
-	return fmt.Sprintf("hello%02d.pdf", fileno)
+	return fmt.Sprintf("hello%02d.svg", fileno)
 }
 
 func debugDraw(e0 *Edge, e1 *Edge) {
-	file := nextfile()
-	dest := draw2dpdf.NewPdf("L", "mm", "A4")
-	gc := draw2dpdf.NewGraphicContext(dest)
+	file, err := os.Create(nextfile())
+	if err != nil {
+		panic("can't create file")
+	}
+	s := svg.New(file)
+	s.Start(1000, 1000)
 	ox, oy := 100.0, 100.0 // put origin at (100,100)
 	//	small, _ := BoundingBox(e0)
 	//	dx, dy := ox-small.X, oy-small.Y
 	dx, dy := ox, oy
-	gc.SetLineWidth(5)
-	gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0x00, 0xff})
-	gc.MoveTo(ox, oy)
-	gc.LineTo(ox, oy)
-	gc.Stroke()
-	gc.SetLineWidth(0.1)
+	s.Circle(ox, oy, 5, "fill:black;stroke:black")
 	for i, e := range e0.Edges() {
 		if i == 0 {
-			gc.SetLineWidth(3)
-			gc.SetStrokeColor(color.RGBA{0x00, 0xff, 0x00, 0xff})
-			gc.MoveTo(e.Org().X+dx, e.Org().Y+dy)
-			gc.LineTo(e.Org().X+dx, e.Org().Y+dy)
-			gc.Stroke()
-			gc.SetLineWidth(0.1)
-			gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
+			s.Circle(e.Org().X+dx, e.Org().Y+dy, 3, "fill:green;stroke:none")
+			s.Line(e.Org().X+dx, e.Org().Y+dy,
+				e.Dest().X+dx, e.Dest().Y+dy,
+				"stroke:#f00;stroke-width:1")
 		} else {
-			gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0xff, 0xff})
+			s.Line(e.Org().X+dx, e.Org().Y+dy,
+				e.Dest().X+dx, e.Dest().Y+dy,
+				"stroke:#00f;stroke-width:1")
 		}
-		gc.MoveTo(e.Org().X+dx, e.Org().Y+dy)
-		gc.LineTo(e.Dest().X+dx, e.Dest().Y+dy)
-		gc.Stroke()
 	}
 	if e1 != nil {
 		for i, e := range e1.Edges() {
 			if i == 0 {
-				gc.SetLineWidth(3)
-				gc.SetStrokeColor(color.RGBA{0x00, 0xff, 0xff, 0xff})
-				gc.MoveTo(e.Org().X+dx, e.Org().Y+dy)
-				gc.LineTo(e.Org().X+dx, e.Org().Y+dy)
-				gc.Stroke()
-				gc.SetLineWidth(0.1)
-				gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
+				s.Circle(e.Org().X+dx, e.Org().Y+dy, 3, "fill:blue;stroke:none")
+				s.Line(e.Org().X+dx, e.Org().Y+dy,
+					e.Dest().X+dx, e.Dest().Y+dy,
+					"stroke:#f00;stroke-width:1")
 			} else {
-				gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0xff, 0xff})
+				s.Line(e.Org().X+dx, e.Org().Y+dy,
+					e.Dest().X+dx, e.Dest().Y+dy,
+					"stroke:#00f;stroke-width:1")
 			}
-			gc.MoveTo(e.Org().X+dx, e.Org().Y+dy)
-			gc.LineTo(e.Dest().X+dx, e.Dest().Y+dy)
-			gc.Stroke()
 		}
 	}
-	draw2dpdf.SaveToPdfFile(file, dest)
+	s.End()
 }
 
 func main() {
-
-	poly1 := Ngon(3, 30)
-	//	rotate(poly1, math.Pi/8)
-	//	small, _ := BoundingBox(poly1)
-	//	translate(poly1, -small.X, -small.Y)
-	//	for _, e := range poly1.Edges() {
-	//		e.Print()
-	//	}
-	//	draw(poly1, nextfile())
-	poly2 := Ngon(5, 20)
-	//	debugDraw(poly1, poly2)
-	//	rotate(poly1, math.Pi/8)
-	//	rotate(poly2, math.Pi/8)
-	//	debugDraw(poly1, poly2)
-	//
-	attach(poly1, poly2)
+	p := Ngon(3, 30)
+	attach(p, Ngon(5, 20))
+	p = p.Lnext()
+	attach(p, Ngon(7, 10))
+	p = p.Lnext()
+	attach(p, Ngon(3, 10))
+	p = p.Rnext()
+	attach(p, Ngon(6, 50))
 }
 
 func edgeLength(e *Edge) float64 {
@@ -134,7 +118,6 @@ func translate(e0 *Edge, dx, dy float64) {
 
 func attach(e1, e2 *Edge) {
 	debugDraw(e1, e2)
-	e2.Print()
 	l1 := edgeLength(e1)
 	l2 := edgeLength(e2)
 	if l1 == 0.0 || l2 == 0.0 {
@@ -143,16 +126,12 @@ func attach(e1, e2 *Edge) {
 	sf := l1 / l2
 	translate(e2, -e2.Org().X, -e2.Org().Y) // bring origin of e2 to absolute origin (0,0)
 	debugDraw(e1, e2)
-	e2.Print()
 	scale(e2, sf)
 	debugDraw(e1, e2)
-	e2.Print()
 	rotate(e2, edgeRadians(e1)-edgeRadians(e2)+math.Pi)
 	debugDraw(e1, e2)
-	e2.Print()
 	translate(e2, e1.Dest().X, e1.Dest().Y)
 	debugDraw(e1, e2)
-	e2.Print()
 	Splice(e1.Oprev(), e2.Sym())
 	Splice(e1.Sym(), e2.Oprev())
 	DeleteEdge(e2)
