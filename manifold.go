@@ -113,6 +113,12 @@ func translate(e0 *Edge, dx, dy float64) {
 	}
 }
 
+func tab() *Edge {
+	pts := []*Point2D{{0.0,0.0},{40.0,0.0},{30.0,10.0},{10.0,10.0}}
+	return Polygon(pts)
+}
+
+
 func attach(e1, e2 *Edge) {
 	debugDraw(e1, e2)
 	l1 := edgeLength(e1)
@@ -179,6 +185,11 @@ function keyHandler(event) {
 	}
 	if (e.keyCode == 82) { // r
                 compile("r");
+		e.preventDefault();
+		return false;
+	}
+	if (e.keyCode == 84) { // t
+                compile("t");
 		e.preventDefault();
 		return false;
 	}
@@ -279,6 +290,8 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	case "r":
 		e0 = e0.Sym()
 		outright = !outright
+	case "t":
+		attachAndMove(tab())
 	default:
 	}
 	out := draw()
