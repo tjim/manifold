@@ -114,10 +114,9 @@ func translate(e0 *Edge, dx, dy float64) {
 }
 
 func tab() *Edge {
-	pts := []*Point2D{{0.0,0.0},{40.0,0.0},{30.0,10.0},{10.0,10.0}}
+	pts := []*Point2D{{0.0, 0.0}, {40.0, 0.0}, {30.0, 10.0}, {10.0, 10.0}}
 	return Polygon(pts)
 }
-
 
 func attach(e1, e2 *Edge) {
 	debugDraw(e1, e2)
@@ -188,8 +187,18 @@ function keyHandler(event) {
 		e.preventDefault();
 		return false;
 	}
+	if (e.keyCode == 83) { // s
+                compile("s");
+		e.preventDefault();
+		return false;
+	}
 	if (e.keyCode == 84) { // t
                 compile("t");
+		e.preventDefault();
+		return false;
+	}
+	if (e.keyCode == 90) { // z
+                compile("z");
 		e.preventDefault();
 		return false;
 	}
@@ -227,7 +236,7 @@ function compileUpdate() {
 </script>
 </head>
 <body>
-3-9: polygon, f: forward, b: back, r: reverse<br />
+3-9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero<br />
 <input autofocus="true" id="edit" onkeydown="keyHandler(event);"></input>
 <div id="output"></div>
 <div id="errors"></div>
@@ -290,40 +299,63 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	case "r":
 		e0 = e0.Sym()
 		outright = !outright
+	case "s":
+		file, err := os.Create("hello.svg")
+		if err != nil {
+			log.Fatal(err)
+		}
+		out := draw(&options{false,false})
+		file.Write(out)
 	case "t":
 		attachAndMove(tab())
+	case "z":
+		e0 = nil
+		internal = make(map[*QuadEdge]bool)
+		outright = true
 	default:
 	}
-	out := draw()
+	out := draw(nil)
 	w.Write(out) // ignore err
 }
 
-func draw() []byte {
+type options struct {
+	origin bool
+	cursor bool
+}
+
+func draw(opt *options) []byte {
+	printOrigin, printCursor := true, true
+	if opt != nil {
+		printOrigin = opt.origin
+		printCursor = opt.cursor
+	}
 	buf := new(bytes.Buffer)
 	s := svg.New(buf)
 	s.Start(1000, 1000)
 	// arrowhead
-	s.Marker("Triangle", 0, 5, 20, 10,"viewBox='0 0 10 10' markerUnits='strokeWidth' orient='auto'")
+	s.Marker("Triangle", 0, 5, 20, 10, "viewBox='0 0 10 10' markerUnits='strokeWidth' orient='auto'")
 	s.Path("M 0 0 L 10 5 L 0 10 z")
 	s.MarkerEnd()
 	ox, oy := 100.0, 100.0 // put origin at (100,100)
 	//	small, _ := BoundingBox(e0)
 	//	dx, dy := ox-small.X, oy-small.Y
 	dx, dy := ox, oy
-	s.Circle(ox, oy, 5, "fill:black;stroke:black")
+	if printOrigin {
+		s.Circle(ox, oy, 5, "fill:black;stroke:black")
+	}
 	for i, e := range e0.Edges() {
-		if i == 0 {
+		if i == 0 && printCursor {
 			s.Line(e.Org().X+dx, e.Org().Y+dy,
 				e.Dest().X+dx, e.Dest().Y+dy,
 				"marker-end='url(#Triangle)' style='stroke:#f00;stroke-width:1'")
 		} else if internal[e.Q] {
 			s.Line(e.Org().X+dx, e.Org().Y+dy,
 				e.Dest().X+dx, e.Dest().Y+dy,
-				"stroke:#00f;stroke-width:1;stroke-dasharray:4")
+				"stroke:#000;stroke-width:1;stroke-dasharray:4")
 		} else {
 			s.Line(e.Org().X+dx, e.Org().Y+dy,
 				e.Dest().X+dx, e.Dest().Y+dy,
-				"stroke:#00f;stroke-width:1")
+				"stroke:#000;stroke-width:1")
 		}
 	}
 	s.End()
