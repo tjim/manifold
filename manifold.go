@@ -9,7 +9,7 @@ import (
 	"math"
 	"net/http"
 	"os"
-//	"text/template"
+	//	"text/template"
 	"bytes"
 )
 
@@ -144,11 +144,11 @@ func main() {
 
 func FrontPage(w http.ResponseWriter, req *http.Request) {
 	w.Write(frontPageText)
-//	frontPage.Execute(w)
+	//	frontPage.Execute(w)
 }
 
 //var frontPage = template.Must(template.New("frontPage").Parse(frontPageText)) // HTML template
-var frontPageText =  []byte(`<!doctype html>
+var frontPageText = []byte(`<!doctype html>
 <html>
 <head>
 <title>Man, I Fold</title>
@@ -166,17 +166,32 @@ pre, textarea {
 </style>
 <script>
 function keyHandler(event) {
-    var e = window.event || event;
-    if (e.keyCode == 13) { // enter
-            compile(e.target);
-            e.preventDefault();
-            return false;
-    }
-    return true;
+	var e = window.event || event;
+	if (e.keyCode == 66) { // b
+                compile("b");
+		e.preventDefault();
+		return false;
+	}
+	if (e.keyCode == 70) { // f
+                compile("f");
+		e.preventDefault();
+		return false;
+	}
+	if (e.keyCode == 82) { // r
+                compile("r");
+		e.preventDefault();
+		return false;
+	}
+	if (51 <= e.keyCode && e.keyCode <= 57) { // 3-9
+                compile(String.fromCharCode(e.keyCode));
+		e.preventDefault();
+		return false;
+	}
+        return true;
 }
 var xmlreq;
-function compile() {
-	var prog = document.getElementById("edit").value;
+function compile(prog) {
+	prog = prog || document.getElementById("edit").value;
 	document.getElementById("edit").value = "";
 	var req = new XMLHttpRequest();
 	xmlreq = req;
@@ -201,6 +216,7 @@ function compileUpdate() {
 </script>
 </head>
 <body>
+3-9: polygon, f: forward, b: back, r: reverse<br />
 <input autofocus="true" id="edit" onkeydown="keyHandler(event);"></input>
 <div id="output"></div>
 <div id="errors"></div>
@@ -209,59 +225,74 @@ function compileUpdate() {
 `)
 
 var e0 *Edge
+var outright = true
+var internal = make(map[*QuadEdge]bool)
+
+func attachAndMove(e1 *Edge) {
+	if e0 == nil {
+		e0 = e1
+	} else {
+		internal[e0.Q] = true
+		if outright {
+			attach(e0, e1)
+			e0 = e0.Oprev()
+		} else {
+			attach(e0.Sym(), e1)
+			e0 = e0.Onext()
+		}
+	}
+}
 
 func Compile(w http.ResponseWriter, req *http.Request) {
-	log.Printf("Compile\n")
 	cmd, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		w.WriteHeader(404)
 		return
 	}
-	log.Printf("Your command: %s\n", cmd)
 	switch string(cmd) {
-	case "tri":
-		e1 := Ngon(3, 40)
-		if e0 == nil {
-			e0 = e1
+	case "3":
+		attachAndMove(Ngon(3, 40))
+	case "4":
+		attachAndMove(Ngon(4, 40))
+	case "5":
+		attachAndMove(Ngon(5, 40))
+	case "6":
+		attachAndMove(Ngon(6, 40))
+	case "7":
+		attachAndMove(Ngon(7, 40))
+	case "8":
+		attachAndMove(Ngon(8, 40))
+	case "9":
+		attachAndMove(Ngon(9, 40))
+	case "f":
+		if outright {
+			e0 = e0.Sym().Onext()
 		} else {
-			attach(e0, e1)
+			e0 = e0.Sym().Oprev()
 		}
-	case "hex":
-		e1 := Ngon(6, 40)
-		if e0 == nil {
-			e0 = e1
+	case "b":
+		if outright {
+			e0 = e0.Oprev().Sym()
 		} else {
-			attach(e0, e1)
+			e0 = e0.Onext().Sym()
 		}
-	case "l":
-		e0 = e0.Lnext()
 	case "r":
-		e0 = e0.Rprev()
-	case "tl":
-		e0 = e0.Onext()
-	case "tr":
-		e0 = e0.Oprev()
-	case "ta":
 		e0 = e0.Sym()
-	case "box":
-		fallthrough
+		outright = !outright
 	default:
-		e1 := Ngon(4, 40)
-		if e0 == nil {
-			e0 = e1
-		} else {
-			attach(e0, e1)
-		}
 	}
 	out := draw()
 	w.Write(out) // ignore err
 }
 
 func draw() []byte {
-	log.Println("draw()")
 	buf := new(bytes.Buffer)
 	s := svg.New(buf)
 	s.Start(1000, 1000)
+	// arrowhead
+	s.Marker("Triangle", 0, 5, 20, 10,"viewBox='0 0 10 10' markerUnits='strokeWidth' orient='auto'")
+	s.Path("M 0 0 L 10 5 L 0 10 z")
+	s.MarkerEnd()
 	ox, oy := 100.0, 100.0 // put origin at (100,100)
 	//	small, _ := BoundingBox(e0)
 	//	dx, dy := ox-small.X, oy-small.Y
@@ -269,10 +300,13 @@ func draw() []byte {
 	s.Circle(ox, oy, 5, "fill:black;stroke:black")
 	for i, e := range e0.Edges() {
 		if i == 0 {
-			s.Circle(e.Org().X+dx, e.Org().Y+dy, 3, "fill:green;stroke:none")
 			s.Line(e.Org().X+dx, e.Org().Y+dy,
 				e.Dest().X+dx, e.Dest().Y+dy,
-				"stroke:#f00;stroke-width:1")
+				"marker-end='url(#Triangle)' style='stroke:#f00;stroke-width:1'")
+		} else if internal[e.Q] {
+			s.Line(e.Org().X+dx, e.Org().Y+dy,
+				e.Dest().X+dx, e.Dest().Y+dy,
+				"stroke:#00f;stroke-width:1;stroke-dasharray:4")
 		} else {
 			s.Line(e.Org().X+dx, e.Org().Y+dy,
 				e.Dest().X+dx, e.Dest().Y+dy,
@@ -280,6 +314,5 @@ func draw() []byte {
 		}
 	}
 	s.End()
-	log.Println("draw() done")
 	return buf.Bytes()
 }
