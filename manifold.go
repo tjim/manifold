@@ -167,6 +167,7 @@ pre, textarea {
 	line-height: 15pt;
 }
 #edit, #output, #errors { width: 100%; text-align: left; }
+#output { height: 100%; }
 #errors { color: #c00; }
 </style>
 <script>
@@ -179,6 +180,11 @@ function keyHandler(event) {
 	}
 	if (e.keyCode == 70) { // f
                 compile("f");
+		e.preventDefault();
+		return false;
+	}
+	if (e.keyCode == 77) { // m
+                compile("m");
 		e.preventDefault();
 		return false;
 	}
@@ -236,7 +242,7 @@ function compileUpdate() {
 </script>
 </head>
 <body>
-3-9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero<br />
+3-9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero, m: maximize toggle<br />
 <input autofocus="true" id="edit" onkeydown="keyHandler(event);"></input>
 <div id="output"></div>
 <div id="errors"></div>
@@ -284,18 +290,20 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		attachAndMove(Ngon(8, 40))
 	case "9":
 		attachAndMove(Ngon(9, 40))
-	case "f":
-		if outright {
-			e0 = e0.Sym().Onext()
-		} else {
-			e0 = e0.Sym().Oprev()
-		}
 	case "b":
 		if outright {
 			e0 = e0.Oprev().Sym()
 		} else {
 			e0 = e0.Onext().Sym()
 		}
+	case "f":
+		if outright {
+			e0 = e0.Sym().Onext()
+		} else {
+			e0 = e0.Sym().Oprev()
+		}
+	case "m":
+		maximize = !maximize
 	case "r":
 		e0 = e0.Sym()
 		outright = !outright
@@ -304,7 +312,7 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		out := draw(&options{false,false})
+		out := draw(&options{false, false})
 		file.Write(out)
 	case "t":
 		attachAndMove(tab())
@@ -319,45 +327,78 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 }
 
 type options struct {
-	origin bool
+	border bool
 	cursor bool
 }
 
+var maximize = false
+
 func draw(opt *options) []byte {
-	printOrigin, printCursor := true, true
+	printBorder, printCursor := true, true
 	if opt != nil {
-		printOrigin = opt.origin
+		printBorder = opt.border
 		printCursor = opt.cursor
 	}
 	buf := new(bytes.Buffer)
 	s := svg.New(buf)
-	s.Start(1000, 1000)
+	s.Startunit(11.0, 8.5, "in", "viewBox='0 0 1100 850'")
+	if printBorder {
+		s.Rect(0, 0, 1100, 850, "stroke:black; fill:none")
+	}
+	if e0 == nil {
+		s.End()
+		return buf.Bytes()
+	}
 	// arrowhead
 	s.Marker("Triangle", 0, 5, 20, 10, "viewBox='0 0 10 10' markerUnits='strokeWidth' orient='auto'")
 	s.Path("M 0 0 L 10 5 L 0 10 z")
 	s.MarkerEnd()
-	ox, oy := 100.0, 100.0 // put origin at (100,100)
-	//	small, _ := BoundingBox(e0)
-	//	dx, dy := ox-small.X, oy-small.Y
-	dx, dy := ox, oy
-	if printOrigin {
-		s.Circle(ox, oy, 5, "fill:black;stroke:black")
+	small, big := BoundingBox(e0)
+
+	// margin
+	s.Gtransform(fmt.Sprintf("scale(%f) translate(25,25)", 1050.0/1100.0))
+
+	scale := 1.0
+	width := big.X - small.X
+	height := big.Y - small.Y
+	scaleX := 1100.0 / width
+	scaleY := 850 / height
+	if scaleX < 1 || scaleY < 1 || maximize { // must scale down to fit or up to maximize
+		scale = math.Min(scaleX, scaleY)
 	}
+	if scale != 1 {
+		s.Gtransform(fmt.Sprintf("scale(%f)", scale))
+	}
+
+	shift := small.X < 0 || small.Y < 0 || maximize
+	if shift {
+		dx, dy := -small.X, -small.Y
+		s.Gtransform(fmt.Sprintf("translate(%f,%f)", dx, dy))
+	}
+
+	//	dx, dy := ox-small.X, oy-small.Y
 	for i, e := range e0.Edges() {
 		if i == 0 && printCursor {
-			s.Line(e.Org().X+dx, e.Org().Y+dy,
-				e.Dest().X+dx, e.Dest().Y+dy,
+			s.Line(e.Org().X, e.Org().Y,
+				e.Dest().X, e.Dest().Y,
 				"marker-end='url(#Triangle)' style='stroke:#f00;stroke-width:1'")
 		} else if internal[e.Q] {
-			s.Line(e.Org().X+dx, e.Org().Y+dy,
-				e.Dest().X+dx, e.Dest().Y+dy,
+			s.Line(e.Org().X, e.Org().Y,
+				e.Dest().X, e.Dest().Y,
 				"stroke:#000;stroke-width:1;stroke-dasharray:4")
 		} else {
-			s.Line(e.Org().X+dx, e.Org().Y+dy,
-				e.Dest().X+dx, e.Dest().Y+dy,
+			s.Line(e.Org().X, e.Org().Y,
+				e.Dest().X, e.Dest().Y,
 				"stroke:#000;stroke-width:1")
 		}
 	}
+	if shift {
+		s.Gend()
+	}
+	if scale != 1 {
+		s.Gend()
+	}
+	s.Gend()
 	s.End()
 	return buf.Bytes()
 }
