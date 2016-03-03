@@ -293,13 +293,19 @@ func attachAndMove(e1 *Edge) {
 		e0 = e1
 	} else {
 		internal[e0.Q] = true
+		eNext := forwardSkipTabs(e0)
 		if outright {
 			attach(e0, e1)
-			e0 = e0.Oprev()
+			if *eNext == *e0 {
+				eNext = e0.Oprev()
+			}
 		} else {
 			attach(e0.Sym(), e1)
-			e0 = e0.Onext()
+			if *eNext == *e0 {
+				eNext = e0.Onext()
+			}
 		}
+		e0 = eNext
 	}
 }
 
@@ -373,7 +379,9 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		out := draw(&options{false, false})
 		file.Write(out)
 	case "t":
-		attachAndMove(tab())
+		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
+			attachAndMove(tab())
+		}
 	case "z":
 		e0 = nil
 		internal = make(map[*QuadEdge]bool)
