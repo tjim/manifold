@@ -421,6 +421,13 @@ type options struct {
 	cursor bool
 }
 
+var documentUnits = "in"
+var documentUnitWidth = 11.0
+var documentUnitHeight = 8.5
+var documentWidth = 1100.0
+var documentHeight = 850.0
+var documentMargin = 25.0
+
 func draw(opt *options) []byte {
 	printBorder, printCursor := true, true
 	if opt != nil {
@@ -429,9 +436,9 @@ func draw(opt *options) []byte {
 	}
 	buf := new(bytes.Buffer)
 	s := svg.New(buf)
-	s.Startunit(11.0, 8.5, "in", "viewBox='0 0 1100 850'")
+	s.Startunit(documentUnitWidth, documentUnitHeight, documentUnits, fmt.Sprintf("viewBox='0 0 %f %f'", documentWidth, documentHeight))
 	if printBorder {
-		s.Rect(0, 0, 1100, 850, "stroke:black; fill:none")
+		s.Rect(0, 0, documentWidth, documentHeight, "stroke:black; fill:none")
 	}
 	if e0 == nil {
 		s.End()
@@ -444,13 +451,13 @@ func draw(opt *options) []byte {
 	small, big := BoundingBox(e0)
 
 	// margin
-	s.Gtransform(fmt.Sprintf("scale(%f) translate(25,25)", 1050.0/1100.0))
+	s.Gtransform(fmt.Sprintf("translate(%f,%f)", documentMargin, documentMargin))
 
 	scale := 1.0
 	width := big.X - small.X
 	height := big.Y - small.Y
-	scaleX := 1100.0 / width
-	scaleY := 850 / height
+	scaleX := (documentWidth - 2*documentMargin) / width
+	scaleY := (documentHeight - 2*documentMargin) / height
 	if scaleX < 1 || scaleY < 1 || maximize { // must scale down to fit or up to maximize
 		scale = math.Min(scaleX, scaleY)
 	}
@@ -464,7 +471,6 @@ func draw(opt *options) []byte {
 		s.Gtransform(fmt.Sprintf("translate(%f,%f)", dx, dy))
 	}
 
-	//	dx, dy := ox-small.X, oy-small.Y
 	for i, e := range e0.Edges() {
 		if i == 0 && printCursor {
 			s.Line(e.Org().X, e.Org().Y,
