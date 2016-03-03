@@ -115,10 +115,12 @@ func (e *Edge) SetDest(d *Point2D) {
 	e.Sym().SetOrg(d)
 }
 
-func Ngon(n int, radius float64) *Edge {
+// regular polygon with n sides of length sideLength
+func Ngon(n int, sideLength float64) *Edge {
 	if n < 3 {
 		return nil
 	}
+	radius := (sideLength / 2) / math.Sin(math.Pi/float64(n))
 	pts := make([]*Point2D, n)
 	for i := range pts {
 		y, x := math.Sincos(math.Pi * float64(2*i) / float64(n))
@@ -299,4 +301,3 @@ func BoundingBox(e *Edge) (small, big *Point2D) {
 	}
 	return
 }
-
