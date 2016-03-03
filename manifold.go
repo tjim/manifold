@@ -126,7 +126,7 @@ func tab() *Edge {
 }
 
 func tab2() *Edge {
-	pts := []*Point2D{{0.0, 0.0}, {10.0, 0.0}, {0.0, 20.0}, {-10.0, 0.0}}
+	pts := []*Point2D{{0, 0}, {25, 0}, {15, 10}, {8, 10}, {-2, 2}}
 	p := Polygon(pts)
 	for _, e := range p.Edges() {
 		if *e == *p {
@@ -139,17 +139,23 @@ func tab2() *Edge {
 
 func splitBack(e *Edge) *Edge {
 	// split the edge e into two edges:
-	// A----e---->B becomes A----e2---->A'----e---->B
-	// New vertex A' has the same geometric coordinates as A
-	// Return the new edge e2
-	org := e.Org()
+	// A----e---->B becomes A----e1---->A'----e---->B
+	// New vertex A' is halfway between A and B
+	// Return the new edge e1
+
 	prev := e.Oprev()
 	Splice(e, prev)
 	e1 := MakeEdge()
 	Splice(e1, prev)
 	Splice(e1.Sym(), e)
+
+	org := e.Org()
+	dest := e.Dest()
+	mid := &Point2D{(dest.X+org.X)/2, (dest.Y+org.Y)/2}
 	e1.SetOrg(org)
-	e1.SetDest(org)
+	e1.SetDest(mid)
+	e.SetOrg(mid)
+
 	return e1
 }
 
@@ -386,17 +392,12 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		}
 	case "v":
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
-			e1 := splitBack(e0)
-			tabEdge[e1.Q] = true
-			eLen := edgeLength(e0)
-			eRad := edgeRadians(e0)
-			dy, dx := math.Sincos(eRad)
-			dx, dy = dx*(eLen-10.0), dy*(eLen-10.0)
-			org := e0.Org()
-			mid := &Point2D{org.X + dx, org.Y + dy}
-			e1.SetDest(mid)
-			e0.SetOrg(mid)
-			attachAndMove(tab2())
+			if outIsToRight {
+			} else {
+				e1 := splitBack(e0)
+				tabEdge[e1.Q] = true
+				attachAndMove(tab2())
+			}
 		}
 	case "z":
 		e0 = nil
@@ -405,6 +406,9 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		outIsToRight = true
 		maximize = false
 	default:
+		w.WriteHeader(404)
+		w.Write([]byte("Unknown command"))
+		return
 	}
 	out := draw(nil)
 	w.Write(out) // ignore err
