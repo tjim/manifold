@@ -199,7 +199,8 @@ body {
 	font-size: 100%;
 	line-height: 15pt;
 }
-#errors { color: #c00; }
+#commands { text-align: center }
+#errors { height: 20pt; color: #c00; text-align: center }
 </style>
 <script>
 function keyHandler(event) {
@@ -270,15 +271,14 @@ function compileUpdate() {
 		document.getElementById("errors").innerHTML = "";
 	} else {
 		document.getElementById("errors").innerHTML = req.responseText;
-		document.getElementById("output").innerHTML = "";
 	}
 }
 </script>
 </head>
 <body onload='compile("z")' onkeydown="keyHandler(event);">
-3-9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero, m: maximize toggle<br />
-<div id="output"></div>
+<div id="commands">3&ndash;9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero, m: maximize toggle</div>
 <div id="errors"></div>
+<div id="output" align="center"></div>
 </body>
 </html>
 `)
@@ -346,6 +346,7 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	cmd, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		w.WriteHeader(404)
+		w.Write([]byte("Error"))
 		return
 	}
 	switch string(cmd) {
