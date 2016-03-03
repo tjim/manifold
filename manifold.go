@@ -201,7 +201,7 @@ pre, textarea {
 	font-size: 100%;
 	line-height: 15pt;
 }
-#edit, #output, #errors { width: 100%; text-align: left; }
+#output, #errors { width: 100%; text-align: left; }
 #output { height: 100%; }
 #errors { color: #c00; }
 </style>
@@ -257,8 +257,6 @@ function keyHandler(event) {
 }
 var xmlreq;
 function compile(prog) {
-	prog = prog || document.getElementById("edit").value;
-	document.getElementById("edit").value = "";
 	var req = new XMLHttpRequest();
 	xmlreq = req;
 	req.onreadystatechange = compileUpdate;
@@ -281,9 +279,8 @@ function compileUpdate() {
 }
 </script>
 </head>
-<body onload='compile("z")'>
+<body onload='compile("z")' onkeydown="keyHandler(event);">
 3-9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero, m: maximize toggle<br />
-<input autofocus="true" id="edit" onkeydown="keyHandler(event);"></input>
 <div id="output"></div>
 <div id="errors"></div>
 </body>
@@ -291,7 +288,7 @@ function compileUpdate() {
 `)
 
 var e0 *Edge
-var outright = true
+var outIsToRight = true // in coordinate system where origin is at bottom left
 var internal = make(map[*QuadEdge]bool)
 var tabEdge = make(map[*QuadEdge]bool)
 var maximize = false
@@ -302,7 +299,7 @@ func attachAndMove(e1 *Edge) {
 	} else {
 		internal[e0.Q] = true
 		eNext := forwardSkipTabs(e0)
-		if outright {
+		if outIsToRight {
 			attach(e0, e1)
 			if *eNext == *e0 {
 				eNext = e0.Oprev()
@@ -318,7 +315,7 @@ func attachAndMove(e1 *Edge) {
 }
 
 func backward(e *Edge) *Edge {
-	if outright {
+	if outIsToRight {
 		return e.Oprev().Sym()
 	} else {
 		return e.Onext().Sym()
@@ -334,7 +331,7 @@ func backwardSkipTabs(e *Edge) *Edge {
 }
 
 func forward(e *Edge) *Edge {
-	if outright {
+	if outIsToRight {
 		return e.Sym().Onext()
 	} else {
 		return e.Sym().Oprev()
@@ -378,7 +375,7 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		maximize = !maximize
 	case "r":
 		e0 = e0.Sym()
-		outright = !outright
+		outIsToRight = !outIsToRight
 	case "s":
 		file, err := os.Create("hello.svg")
 		if err != nil {
@@ -408,7 +405,7 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		e0 = nil
 		internal = make(map[*QuadEdge]bool)
 		tabEdge = make(map[*QuadEdge]bool)
-		outright = true
+		outIsToRight = true
 		maximize = false
 	default:
 	}
