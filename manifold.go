@@ -195,14 +195,10 @@ var frontPageText = []byte(`<!doctype html>
 <style>
 body {
 	font-size: 18pt;
-}
-pre, textarea {
 	font-family: Optima, Calibri, 'DejaVu Sans', sans-serif;
 	font-size: 100%;
 	line-height: 15pt;
 }
-#output, #errors { width: 100%; text-align: left; }
-#output { height: 100%; }
 #errors { color: #c00; }
 </style>
 <script>
