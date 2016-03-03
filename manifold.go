@@ -357,19 +357,19 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	}
 	switch string(cmd) {
 	case "3":
-		attachAndMove(Ngon(3, 40))
+		attachAndMove(Ngon(3, documentPolygonSide))
 	case "4":
-		attachAndMove(Ngon(4, 40))
+		attachAndMove(Ngon(4, documentPolygonSide))
 	case "5":
-		attachAndMove(Ngon(5, 40))
+		attachAndMove(Ngon(5, documentPolygonSide))
 	case "6":
-		attachAndMove(Ngon(6, 40))
+		attachAndMove(Ngon(6, documentPolygonSide))
 	case "7":
-		attachAndMove(Ngon(7, 40))
+		attachAndMove(Ngon(7, documentPolygonSide))
 	case "8":
-		attachAndMove(Ngon(8, 40))
+		attachAndMove(Ngon(8, documentPolygonSide))
 	case "9":
-		attachAndMove(Ngon(9, 40))
+		attachAndMove(Ngon(9, documentPolygonSide))
 	case "b":
 		e0 = backwardSkipTabs(e0)
 	case "f":
@@ -427,6 +427,7 @@ var documentUnitHeight = 8.5
 var documentWidth = 1100.0
 var documentHeight = 850.0
 var documentMargin = 25.0
+var documentPolygonSide = 50.0
 
 func draw(opt *options) []byte {
 	printBorder, printCursor := true, true
