@@ -115,7 +115,40 @@ func translate(e0 *Edge, dx, dy float64) {
 
 func tab() *Edge {
 	pts := []*Point2D{{0.0, 0.0}, {40.0, 0.0}, {30.0, 10.0}, {10.0, 10.0}}
-	return Polygon(pts)
+	p := Polygon(pts)
+	for _, e := range p.Edges() {
+		if *e == *p {
+			continue
+		}
+		tabEdge[e.Q] = true
+	}
+	return p
+}
+
+func tab2() *Edge {
+	pts := []*Point2D{{0.0, 0.0}, {10.0, 0.0}, {0.0, 20.0}, {-10.0, 0.0}}
+	p := Polygon(pts)
+	for _, e := range p.Edges() {
+		if *e == *p {
+			continue
+		}
+		tabEdge[e.Q] = true
+	}
+	return p
+}
+
+func splitBack(e *Edge) {
+	// split the edge e into two edges:
+	// A----e---->B becomes A----e2---->A'----e---->B
+	// New vertex A' has the same geometric coordinates as A
+	org := e.Org()
+	p := e.Oprev()
+	Splice(e, p)
+	e2 := MakeEdge()
+	Splice(e2, p)
+	Splice(e2.Sym(), e)
+	e2.SetOrg(org)
+	e2.SetDest(org)
 }
 
 func attach(e1, e2 *Edge) {
@@ -253,6 +286,7 @@ function compileUpdate() {
 var e0 *Edge
 var outright = true
 var internal = make(map[*QuadEdge]bool)
+var tabEdge = make(map[*QuadEdge]bool)
 
 func attachAndMove(e1 *Edge) {
 	if e0 == nil {
@@ -267,6 +301,38 @@ func attachAndMove(e1 *Edge) {
 			e0 = e0.Onext()
 		}
 	}
+}
+
+func backward(e *Edge) *Edge {
+	if outright {
+		return e.Oprev().Sym()
+	} else {
+		return e.Onext().Sym()
+	}
+}
+
+func backwardSkipTabs(e *Edge) *Edge {
+	e1 := backward(e)
+	for tabEdge[e1.Q] && *e1 != *e {
+		e1 = backward(e1)
+	}
+	return e1
+}
+
+func forward(e *Edge) *Edge {
+	if outright {
+		return e.Sym().Onext()
+	} else {
+		return e.Sym().Oprev()
+	}
+}
+
+func forwardSkipTabs(e *Edge) *Edge {
+	e1 := forward(e)
+	for tabEdge[e1.Q] && *e1 != *e {
+		e1 = forward(e1)
+	}
+	return e1
 }
 
 func Compile(w http.ResponseWriter, req *http.Request) {
@@ -291,17 +357,9 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	case "9":
 		attachAndMove(Ngon(9, 40))
 	case "b":
-		if outright {
-			e0 = e0.Oprev().Sym()
-		} else {
-			e0 = e0.Onext().Sym()
-		}
+		e0 = backwardSkipTabs(e0)
 	case "f":
-		if outright {
-			e0 = e0.Sym().Onext()
-		} else {
-			e0 = e0.Sym().Oprev()
-		}
+		e0 = forwardSkipTabs(e0)
 	case "m":
 		maximize = !maximize
 	case "r":
@@ -319,6 +377,7 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	case "z":
 		e0 = nil
 		internal = make(map[*QuadEdge]bool)
+		tabEdge = make(map[*QuadEdge]bool)
 		outright = true
 	default:
 	}
