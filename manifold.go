@@ -274,7 +274,7 @@ function compileUpdate() {
 }
 </script>
 </head>
-<body>
+<body onload='compile("z")'>
 3-9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero, m: maximize toggle<br />
 <input autofocus="true" id="edit" onkeydown="keyHandler(event);"></input>
 <div id="output"></div>
