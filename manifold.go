@@ -137,18 +137,20 @@ func tab2() *Edge {
 	return p
 }
 
-func splitBack(e *Edge) {
+func splitBack(e *Edge) *Edge{
 	// split the edge e into two edges:
 	// A----e---->B becomes A----e2---->A'----e---->B
 	// New vertex A' has the same geometric coordinates as A
+	// Return the new edge e2
 	org := e.Org()
-	p := e.Oprev()
-	Splice(e, p)
-	e2 := MakeEdge()
-	Splice(e2, p)
-	Splice(e2.Sym(), e)
-	e2.SetOrg(org)
-	e2.SetDest(org)
+	prev := e.Oprev()
+	Splice(e, prev)
+	e1 := MakeEdge()
+	Splice(e1, prev)
+	Splice(e1.Sym(), e)
+	e1.SetOrg(org)
+	e1.SetDest(org)
+	return e1
 }
 
 func attach(e1, e2 *Edge) {
@@ -233,6 +235,11 @@ function keyHandler(event) {
 	}
 	if (e.keyCode == 84) { // t
                 compile("t");
+		e.preventDefault();
+		return false;
+	}
+	if (e.keyCode == 86) { // v
+                compile("v");
 		e.preventDefault();
 		return false;
 	}
@@ -381,6 +388,20 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	case "t":
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
 			attachAndMove(tab())
+		}
+	case "v":
+		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
+			e1 := splitBack(e0)
+			tabEdge[e1.Q] = true
+			eLen := edgeLength(e0)
+			eRad := edgeRadians(e0)
+			dy, dx := math.Sincos(eRad)
+			dx, dy = dx * (eLen - 10.0), dy * (eLen - 10.0)
+			org := e0.Org()
+			mid := &Point2D{org.X+dx, org.Y+dy}
+			e1.SetDest(mid)
+			e0.SetOrg(mid)
+			attachAndMove(tab2())
 		}
 	case "z":
 		e0 = nil
