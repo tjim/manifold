@@ -137,7 +137,7 @@ func tab2() *Edge {
 	return p
 }
 
-func splitBack(e *Edge) *Edge{
+func splitBack(e *Edge) *Edge {
 	// split the edge e into two edges:
 	// A----e---->B becomes A----e2---->A'----e---->B
 	// New vertex A' has the same geometric coordinates as A
@@ -294,6 +294,7 @@ var e0 *Edge
 var outright = true
 var internal = make(map[*QuadEdge]bool)
 var tabEdge = make(map[*QuadEdge]bool)
+var maximize = false
 
 func attachAndMove(e1 *Edge) {
 	if e0 == nil {
@@ -396,9 +397,9 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 			eLen := edgeLength(e0)
 			eRad := edgeRadians(e0)
 			dy, dx := math.Sincos(eRad)
-			dx, dy = dx * (eLen - 10.0), dy * (eLen - 10.0)
+			dx, dy = dx*(eLen-10.0), dy*(eLen-10.0)
 			org := e0.Org()
-			mid := &Point2D{org.X+dx, org.Y+dy}
+			mid := &Point2D{org.X + dx, org.Y + dy}
 			e1.SetDest(mid)
 			e0.SetOrg(mid)
 			attachAndMove(tab2())
@@ -408,6 +409,7 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		internal = make(map[*QuadEdge]bool)
 		tabEdge = make(map[*QuadEdge]bool)
 		outright = true
+		maximize = false
 	default:
 	}
 	out := draw(nil)
@@ -418,8 +420,6 @@ type options struct {
 	border bool
 	cursor bool
 }
-
-var maximize = false
 
 func draw(opt *options) []byte {
 	printBorder, printCursor := true, true
