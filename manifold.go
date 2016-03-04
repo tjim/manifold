@@ -114,7 +114,7 @@ func translate(e0 *Edge, dx, dy float64) {
 }
 
 func tab() *Edge {
-	pts := []*Point2D{{0.0, 0.0}, {40.0, 0.0}, {30.0, 10.0}, {10.0, 10.0}}
+	pts := []*Point2D{{0, 0}, {40, 0}, {30, 10}, {10, 10}}
 	p := Polygon(pts)
 	for _, e := range p.Edges() {
 		if *e == *p {
@@ -137,7 +137,7 @@ func tab2() *Edge {
 	return p
 }
 
-func splitBack(e *Edge) *Edge {
+func halfsies(e *Edge) *Edge {
 	// split the edge e into two edges:
 	// A----e---->B becomes A----e1---->A'----e---->B
 	// New vertex A' is halfway between A and B
@@ -394,8 +394,15 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
 			if outIsToRight {
 			} else {
-				e1 := splitBack(e0)
+				eOrig := e0
+				e2 := halfsies(e0)
+				e1 := halfsies(e0)
+				e3 := halfsies(e2)
 				tabEdge[e1.Q] = true
+				tabEdge[e3.Q] = true
+				e0 = e2
+				attachAndMove(tab2())
+				e0 = eOrig
 				attachAndMove(tab2())
 			}
 		}
