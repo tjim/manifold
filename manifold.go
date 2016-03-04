@@ -126,7 +126,7 @@ func tab() *Edge {
 }
 
 func tab2() *Edge {
-	pts := []*Point2D{{0, 0}, {25, 0}, {15, 10}, {8, 10}, {-2, 2}}
+	pts := []*Point2D{{0, 0}, {25, 0}, {15, 10}, {8, 10}, {-2, 0}}
 	p := Polygon(pts)
 	for _, e := range p.Edges() {
 		if *e == *p {
@@ -478,7 +478,7 @@ func draw(opt *options) []byte {
 		} else if internal[e.Q] {
 			s.Line(e.Org().X, e.Org().Y,
 				e.Dest().X, e.Dest().Y,
-				"stroke:#000;stroke-width:1;stroke-dasharray:4")
+				"stroke:#000;stroke-width:1;stroke-dasharray:1 2")
 		} else {
 			s.Line(e.Org().X, e.Org().Y,
 				e.Dest().X, e.Dest().Y,
