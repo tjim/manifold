@@ -485,7 +485,7 @@ func draw(opt *options) []byte {
 		} else if internal[e.Q] {
 			s.Line(e.Org().X, e.Org().Y,
 				e.Dest().X, e.Dest().Y,
-				"stroke:#000;stroke-width:1;stroke-dasharray:1 2")
+				"stroke:#000;stroke-width:1;stroke-dasharray:1 4")
 		} else {
 			s.Line(e.Org().X, e.Org().Y,
 				e.Dest().X, e.Dest().Y,
