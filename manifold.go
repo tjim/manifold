@@ -151,7 +151,7 @@ func halfsies(e *Edge) *Edge {
 
 	org := e.Org()
 	dest := e.Dest()
-	mid := &Point2D{(dest.X+org.X)/2, (dest.Y+org.Y)/2}
+	mid := &Point2D{(dest.X + org.X) / 2, (dest.Y + org.Y) / 2}
 	e1.SetOrg(org)
 	e1.SetDest(mid)
 	e.SetOrg(mid)
@@ -477,6 +477,15 @@ func draw(opt *options) []byte {
 		s.Gtransform(fmt.Sprintf("translate(%f,%f)", dx, dy))
 	}
 
+	// Draw the perimeter as one continuous path, for efficient cutting
+	pathbuf := new(bytes.Buffer)
+	fmt.Fprintf(pathbuf, "M %f %f %f %f", e0.Org().X, e0.Org().Y, e0.Dest().X, e0.Dest().Y)
+	for ePath := forward(e0); *ePath != *e0; ePath = forward(ePath) {
+		fmt.Fprintf(pathbuf, "L %f %f", ePath.Dest().X, ePath.Dest().Y)
+	}
+	s.Path(string(pathbuf.Bytes()), "stroke:#000;stroke-width:1;fill:none")
+
+	// Draw interior edges and the cursor
 	for i, e := range e0.Edges() {
 		if i == 0 && printCursor {
 			s.Line(e.Org().X, e.Org().Y,
@@ -486,10 +495,6 @@ func draw(opt *options) []byte {
 			s.Line(e.Org().X, e.Org().Y,
 				e.Dest().X, e.Dest().Y,
 				"stroke:#000;stroke-width:1;stroke-dasharray:1 4")
-		} else {
-			s.Line(e.Org().X, e.Org().Y,
-				e.Dest().X, e.Dest().Y,
-				"stroke:#000;stroke-width:1")
 		}
 	}
 	if shift {
