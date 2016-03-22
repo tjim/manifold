@@ -113,8 +113,7 @@ func translate(e0 *Edge, dx, dy float64) {
 	}
 }
 
-func tab() *Edge {
-	pts := []*Point2D{{0, 0}, {40, 0}, {30, 10}, {10, 10}}
+func tab0(pts []*Point2D) *Edge {
 	p := Polygon(pts)
 	for _, e := range p.Edges() {
 		if *e == *p {
@@ -125,16 +124,124 @@ func tab() *Edge {
 	return p
 }
 
-func tab2() *Edge {
-	pts := []*Point2D{{0, 0}, {25, 0}, {15, 10}, {8, 10}, {-2, 0}}
-	p := Polygon(pts)
-	for _, e := range p.Edges() {
-		if *e == *p {
-			continue
+func tab() *Edge { // traditional tab
+	pts := []*Point2D{{0, 0}, {40, 0}, {30, 10}, {10, 10}}
+	return tab0(pts)
+}
+
+func tab2() *Edge { // tab with "hook" on one end
+	pts := []*Point2D{{0, 0}, {25, 0}, {15, 10}, {-5, 10}, {-5, 0}}
+	return tab0(pts)
+}
+
+func tab3() *Edge { // a square tab
+	pts := []*Point2D{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
+	return tab0(pts)
+}
+
+func tab4() *Edge { // a triangular tab
+	pts := []*Point2D{{0, 0}, {10, 0}, {0, 10}}
+	return tab0(pts)
+}
+
+func absAngle(rad float64) float64 {
+	for math.Abs(rad) > math.Pi {
+		if rad < 0 {
+			rad = rad + 2*math.Pi
+		} else {
+			rad = rad - 2*math.Pi
 		}
-		tabEdge[e.Q] = true
 	}
-	return p
+	return rad / math.Pi * 180
+}
+
+func tab5(e *Edge) *Edge { // a tab that pays attention to narrow angles
+	if !outIsToRight {
+		e = e.Sym()
+	}
+	beforeAngle := 45.0
+	if ang := absAngle(edgeRadians(backward(e)) - edgeRadians(e.Sym())); ang < 0 && math.Abs(ang) < beforeAngle {
+		beforeAngle = math.Abs(ang)
+	}
+	afterAngle := 45.0
+	if ang := absAngle(edgeRadians(e.Sym()) - edgeRadians(forward(e))); ang < 0 && math.Abs(ang) < afterAngle {
+		afterAngle = math.Abs(ang)
+	}
+	fmt.Printf("before-sym: %.2f\n", absAngle(edgeRadians(backward(e))-edgeRadians(e.Sym())))
+	fmt.Printf(" sym-after: %.2f\n", absAngle(edgeRadians(e.Sym())-edgeRadians(forward(e))))
+	fmt.Printf("beforeAngle: %.2f\n", beforeAngle)
+	fmt.Printf("afterAngle: %.2f\n", afterAngle)
+	fmt.Printf("outIsToRight: %v\n", outIsToRight)
+	alphaAngle := afterAngle
+	betaAngle := beforeAngle
+	/* Draw a tab with left and right angles alpha and beta, with height < width/4.
+
+	           Beta must fit in the angle before, and alpha must fit in the angle after; if not, reduce accordingly.
+
+		   There are two cases.
+
+		   Case 1:
+
+			     D-------------C              -
+			    /               \             |
+			   /                 \            1
+			  /                   \           |
+		   alpha A---------------------B beta     -
+
+			 |--------- 4 ---------|
+
+		   Here alpha is the angle BAD and beta is the angle ABC, and they are known.
+		   If A = (0, 0) and B = (4, 0),
+		   we need the coordinates of C and D:
+		   C = (4 - 1/tan(beta), 1)
+		   D = (1/tan(alpha), 1)
+
+		   Case 2:
+
+			     C              -
+			    / \             |
+			   /   \          h < 1
+			  /     \           |
+		   alpha A-------B beta     -
+
+			 |-- 4 --|
+
+		   Again A = (0, 0) and B = (4, 0),
+		   and we need the coordinates of C.
+		   Let gamma = the angle ACB = (180 - alpha - beta).
+		   By the law of sines,
+
+		       4/sin(gamma) = AC/sin(beta) = BC/sin(alpha)
+
+		   So
+
+		       AC = 4*sin(beta)/sin(gamma)
+
+		   Therefore we can calculate the coordinates of C,
+
+		       AC * cos(alpha), AC * sin(alpha)
+
+		   or
+
+		       4*sin(beta)/sin(gamma)*cos(alpha), 4*sin(beta)/sin(gamma)*sin(alpha)
+
+		   To see whether we are in case 1 or two, check 4*sin(beta)/sin(gamma)*sin(alpha) < 1
+	*/
+	gammaAngle := 180 - alphaAngle - betaAngle
+	alpha := alphaAngle / 180 * math.Pi
+	beta := betaAngle / 180 * math.Pi
+	gamma := gammaAngle / 180 * math.Pi
+	if 4*math.Sin(beta)/math.Sin(gamma)*math.Sin(alpha) < 1 {
+		// case 2
+		fmt.Println("Case 2\n")
+		pts := []*Point2D{{0, 0}, {4, 0}, {4 * math.Sin(beta) / math.Sin(gamma) * math.Cos(alpha), 4 * math.Sin(beta) / math.Sin(gamma) * math.Sin(alpha)}}
+		return tab0(pts)
+	} else {
+		// case 1
+		fmt.Println("Case 1\n")
+		pts := []*Point2D{{0, 0}, {4, 0}, {4 - 1/math.Tan(beta), 1}, {1 / math.Tan(alpha), 1}}
+		return tab0(pts)
+	}
 }
 
 func halfsies(e *Edge) *Edge {
@@ -386,11 +493,32 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		}
 		out := draw(&options{false, false})
 		file.Write(out)
-	case "t":
+	case "t": // traditional tab
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
 			attachAndMove(tab())
 		}
-	case "v":
+	case "v": // experimental tabs
+		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
+			attachAndMove(tab5(e0))
+		}
+		/*
+			if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
+				if outIsToRight {
+				} else {
+					eOrig := e0
+					e2 := halfsies(e0)
+					e1 := halfsies(e0)
+					e3 := halfsies(e2)
+					tabEdge[e1.Q] = true
+					tabEdge[e3.Q] = true
+					e0 = e2
+					attachAndMove(tab3())
+					e0 = eOrig
+					attachAndMove(tab4())
+				}
+			}
+		*/
+	case "v_hook": // experimental tabs
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
 			if outIsToRight {
 			} else {
@@ -451,8 +579,8 @@ func draw(opt *options) []byte {
 		return buf.Bytes()
 	}
 	// arrowhead
-	s.Marker("Triangle", 0, 5, 20, 10, "viewBox='0 0 10 10' markerUnits='strokeWidth' orient='auto'")
-	s.Path("M 0 0 L 10 5 L 0 10 z")
+	s.Marker("Triangle", 9, 3, 10, 6, "viewBox='0 0 10 6' markerUnits='strokeWidth' orient='auto' fill='red'")
+	s.Path("M 0 0 L 10 3 L 0 6 z")
 	s.MarkerEnd()
 	small, big := BoundingBox(e0)
 
