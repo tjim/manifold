@@ -560,7 +560,7 @@ var documentUnitHeight = 8.5
 var documentWidth = 1100.0
 var documentHeight = 850.0
 var documentMargin = 25.0
-var documentPolygonSide = 50.0
+var documentPolygonSide = 100.0
 
 func draw(opt *options) []byte {
 	printBorder, printCursor := true, true
