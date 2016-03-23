@@ -113,37 +113,6 @@ func translate(e0 *Edge, dx, dy float64) {
 	}
 }
 
-func tab0(pts []*Point2D) *Edge {
-	p := Polygon(pts)
-	for _, e := range p.Edges() {
-		if *e == *p {
-			continue
-		}
-		tabEdge[e.Q] = true
-	}
-	return p
-}
-
-func tab() *Edge { // traditional tab
-	pts := []*Point2D{{0, 0}, {40, 0}, {30, 10}, {10, 10}}
-	return tab0(pts)
-}
-
-func tab2() *Edge { // tab with "hook" on one end
-	pts := []*Point2D{{0, 0}, {25, 0}, {15, 10}, {-5, 10}, {-5, 0}}
-	return tab0(pts)
-}
-
-func tab3() *Edge { // a square tab
-	pts := []*Point2D{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
-	return tab0(pts)
-}
-
-func tab4() *Edge { // a triangular tab
-	pts := []*Point2D{{0, 0}, {10, 0}, {0, 10}}
-	return tab0(pts)
-}
-
 func absAngle(rad float64) float64 {
 	for math.Abs(rad) > math.Pi {
 		if rad < 0 {
@@ -155,77 +124,81 @@ func absAngle(rad float64) float64 {
 	return rad / math.Pi * 180
 }
 
-func tab5(e *Edge) *Edge { // a tab that pays attention to narrow angles
-	if !outIsToRight {
-		e = e.Sym()
+func tab0(pts []*Point2D) *Edge {
+	p := Polygon(pts)
+	for _, e := range p.Edges() {
+		if *e == *p {
+			continue
+		}
+		tabEdge[e.Q] = true
 	}
-	beforeAngle := 45.0
-	if ang := absAngle(edgeRadians(backward(e)) - edgeRadians(e.Sym())); ang < 0 && math.Abs(ang) < beforeAngle {
-		beforeAngle = math.Abs(ang)
+	return p
+}
+
+func tab(e *Edge) *Edge { // a tab that pays attention to narrow angles
+	epsilon := 1e-10 // a bit bigger than zero to allow for inaccuracy in calculating angles
+	cwAngle := 45.0
+	cwSym := absAngle(edgeRadians(cwPerimeter(e)) - edgeRadians(e.Sym()))
+	if cwSym < epsilon && math.Abs(cwSym) < cwAngle {
+		cwAngle = math.Abs(cwSym)
 	}
-	afterAngle := 45.0
-	if ang := absAngle(edgeRadians(e.Sym()) - edgeRadians(forward(e))); ang < 0 && math.Abs(ang) < afterAngle {
-		afterAngle = math.Abs(ang)
+	ccwAngle := 45.0
+	symCcw := absAngle(edgeRadians(e.Sym()) - edgeRadians(ccwPerimeter(e)))
+	if symCcw < epsilon && math.Abs(symCcw) < ccwAngle {
+		ccwAngle = math.Abs(symCcw)
 	}
-	fmt.Printf("before-sym: %.2f\n", absAngle(edgeRadians(backward(e))-edgeRadians(e.Sym())))
-	fmt.Printf(" sym-after: %.2f\n", absAngle(edgeRadians(e.Sym())-edgeRadians(forward(e))))
-	fmt.Printf("beforeAngle: %.2f\n", beforeAngle)
-	fmt.Printf("afterAngle: %.2f\n", afterAngle)
-	fmt.Printf("outIsToRight: %v\n", outIsToRight)
-	alphaAngle := afterAngle
-	betaAngle := beforeAngle
+	alphaAngle := ccwAngle
+	betaAngle := cwAngle
 	/* Draw a tab with left and right angles alpha and beta, with height < width/4.
 
-	           Beta must fit in the angle before, and alpha must fit in the angle after; if not, reduce accordingly.
+	   There are two cases.
 
-		   There are two cases.
+	   Case 1:
 
-		   Case 1:
+		     D-------------C              -
+		    /               \             |
+		   /                 \            1
+		  /                   \           |
+	   alpha A---------------------B beta     -
 
-			     D-------------C              -
-			    /               \             |
-			   /                 \            1
-			  /                   \           |
-		   alpha A---------------------B beta     -
+		 |--------- 4 ---------|
 
-			 |--------- 4 ---------|
+	   Here alpha is the angle BAD and beta is the angle ABC, and they are known.
+	   If A = (0, 0) and B = (4, 0),
+	   we need the coordinates of C and D:
+	   C = (4 - 1/tan(beta), 1)
+	   D = (1/tan(alpha), 1)
 
-		   Here alpha is the angle BAD and beta is the angle ABC, and they are known.
-		   If A = (0, 0) and B = (4, 0),
-		   we need the coordinates of C and D:
-		   C = (4 - 1/tan(beta), 1)
-		   D = (1/tan(alpha), 1)
+	   Case 2:
 
-		   Case 2:
+		     C              -
+		    / \             |
+		   /   \          h < 1
+		  /     \           |
+	   alpha A-------B beta     -
 
-			     C              -
-			    / \             |
-			   /   \          h < 1
-			  /     \           |
-		   alpha A-------B beta     -
+		 |-- 4 --|
 
-			 |-- 4 --|
+	   Again A = (0, 0) and B = (4, 0),
+	   and we need the coordinates of C.
+	   Let gamma = the angle ACB = (180 - alpha - beta).
+	   By the law of sines,
 
-		   Again A = (0, 0) and B = (4, 0),
-		   and we need the coordinates of C.
-		   Let gamma = the angle ACB = (180 - alpha - beta).
-		   By the law of sines,
+	       4/sin(gamma) = AC/sin(beta) = BC/sin(alpha)
 
-		       4/sin(gamma) = AC/sin(beta) = BC/sin(alpha)
+	   So
 
-		   So
+	       AC = 4*sin(beta)/sin(gamma)
 
-		       AC = 4*sin(beta)/sin(gamma)
+	   Therefore we can calculate the coordinates of C,
 
-		   Therefore we can calculate the coordinates of C,
+	       AC * cos(alpha), AC * sin(alpha)
 
-		       AC * cos(alpha), AC * sin(alpha)
+	   or
 
-		   or
+	       4*sin(beta)/sin(gamma)*cos(alpha), 4*sin(beta)/sin(gamma)*sin(alpha)
 
-		       4*sin(beta)/sin(gamma)*cos(alpha), 4*sin(beta)/sin(gamma)*sin(alpha)
-
-		   To see whether we are in case 1 or two, check 4*sin(beta)/sin(gamma)*sin(alpha) < 1
+	   To see whether we are in case 1 or two, check 4*sin(beta)/sin(gamma)*sin(alpha) < 1
 	*/
 	gammaAngle := 180 - alphaAngle - betaAngle
 	alpha := alphaAngle / 180 * math.Pi
@@ -233,12 +206,10 @@ func tab5(e *Edge) *Edge { // a tab that pays attention to narrow angles
 	gamma := gammaAngle / 180 * math.Pi
 	if 4*math.Sin(beta)/math.Sin(gamma)*math.Sin(alpha) < 1 {
 		// case 2
-		fmt.Println("Case 2\n")
 		pts := []*Point2D{{0, 0}, {4, 0}, {4 * math.Sin(beta) / math.Sin(gamma) * math.Cos(alpha), 4 * math.Sin(beta) / math.Sin(gamma) * math.Sin(alpha)}}
 		return tab0(pts)
 	} else {
 		// case 1
-		fmt.Println("Case 1\n")
 		pts := []*Point2D{{0, 0}, {4, 0}, {4 - 1/math.Tan(beta), 1}, {1 / math.Tan(alpha), 1}}
 		return tab0(pts)
 	}
@@ -396,8 +367,8 @@ function compileUpdate() {
 </html>
 `)
 
-var e0 *Edge
-var outIsToRight = true // in coordinate system where origin is at bottom left
+var e0 *Edge         // "current" edge, on perimeter in CCW direction in coordinate system with Y coordinates up
+var reversed = false // whether arrow on current edge is draw source->target or target->source
 var internal = make(map[*QuadEdge]bool)
 var tabEdge = make(map[*QuadEdge]bool)
 var maximize = false
@@ -405,29 +376,38 @@ var maximize = false
 func attachAndMove(e1 *Edge) {
 	if e0 == nil {
 		e0 = e1
-	} else {
-		internal[e0.Q] = true
-		eNext := forwardSkipTabs(e0)
-		if outIsToRight {
-			attach(e0, e1)
-			if *eNext == *e0 {
-				eNext = e0.Oprev()
-			}
-		} else {
-			attach(e0.Sym(), e1)
-			if *eNext == *e0 {
-				eNext = e0.Onext()
-			}
-		}
-		e0 = eNext
+		return
 	}
+	internal[e0.Q] = true
+	eNext := forwardSkipTabs(e0)
+	attach(e0, e1)
+	if *eNext == *e0 {
+		eNext = e0.Oprev()
+	}
+	e0 = eNext
+}
+
+func ccwPerimeter(e *Edge) *Edge {
+	return e.Rprev()
+}
+
+func cwPerimeter(e *Edge) *Edge {
+	return e.Rnext()
 }
 
 func backward(e *Edge) *Edge {
-	if outIsToRight {
-		return e.Oprev().Sym()
+	if reversed {
+		return ccwPerimeter(e)
 	} else {
-		return e.Onext().Sym()
+		return cwPerimeter(e)
+	}
+}
+
+func forward(e *Edge) *Edge {
+	if reversed {
+		return cwPerimeter(e)
+	} else {
+		return ccwPerimeter(e)
 	}
 }
 
@@ -437,14 +417,6 @@ func backwardSkipTabs(e *Edge) *Edge {
 		e1 = backward(e1)
 	}
 	return e1
-}
-
-func forward(e *Edge) *Edge {
-	if outIsToRight {
-		return e.Sym().Onext()
-	} else {
-		return e.Sym().Oprev()
-	}
 }
 
 func forwardSkipTabs(e *Edge) *Edge {
@@ -484,8 +456,7 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 	case "m":
 		maximize = !maximize
 	case "r":
-		e0 = e0.Sym()
-		outIsToRight = !outIsToRight
+		reversed = !reversed
 	case "s":
 		file, err := os.Create("hello.svg")
 		if err != nil {
@@ -493,52 +464,15 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		}
 		out := draw(&options{false, false})
 		file.Write(out)
-	case "t": // traditional tab
+	case "t":
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
-			attachAndMove(tab())
-		}
-	case "v": // experimental tabs
-		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
-			attachAndMove(tab5(e0))
-		}
-		/*
-			if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
-				if outIsToRight {
-				} else {
-					eOrig := e0
-					e2 := halfsies(e0)
-					e1 := halfsies(e0)
-					e3 := halfsies(e2)
-					tabEdge[e1.Q] = true
-					tabEdge[e3.Q] = true
-					e0 = e2
-					attachAndMove(tab3())
-					e0 = eOrig
-					attachAndMove(tab4())
-				}
-			}
-		*/
-	case "v_hook": // experimental tabs
-		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
-			if outIsToRight {
-			} else {
-				eOrig := e0
-				e2 := halfsies(e0)
-				e1 := halfsies(e0)
-				e3 := halfsies(e2)
-				tabEdge[e1.Q] = true
-				tabEdge[e3.Q] = true
-				e0 = e2
-				attachAndMove(tab2())
-				e0 = eOrig
-				attachAndMove(tab2())
-			}
+			attachAndMove(tab(e0))
 		}
 	case "z":
 		e0 = nil
 		internal = make(map[*QuadEdge]bool)
 		tabEdge = make(map[*QuadEdge]bool)
-		outIsToRight = true
+		reversed = false
 		maximize = false
 	default:
 		w.WriteHeader(404)
@@ -608,7 +542,7 @@ func draw(opt *options) []byte {
 	// Draw the perimeter as one continuous path, for efficient cutting
 	pathbuf := new(bytes.Buffer)
 	fmt.Fprintf(pathbuf, "M %f %f %f %f", e0.Org().X, e0.Org().Y, e0.Dest().X, e0.Dest().Y)
-	for ePath := forward(e0); *ePath != *e0; ePath = forward(ePath) {
+	for ePath := ccwPerimeter(e0); *ePath != *e0; ePath = ccwPerimeter(ePath) {
 		fmt.Fprintf(pathbuf, "L %f %f", ePath.Dest().X, ePath.Dest().Y)
 	}
 	s.Path(string(pathbuf.Bytes()), "stroke:#000;stroke-width:1;fill:none")
@@ -616,9 +550,12 @@ func draw(opt *options) []byte {
 	// Draw interior edges and the cursor
 	for i, e := range e0.Edges() {
 		if i == 0 && printCursor {
+			if reversed {
+				e = e.Sym()
+			}
 			s.Line(e.Org().X, e.Org().Y,
 				e.Dest().X, e.Dest().Y,
-				"marker-end='url(#Triangle)' style='stroke:#f00;stroke-width:1'")
+				"marker-end='url(#Triangle)' style='stroke:#f00;stroke-width:2'")
 		} else if internal[e.Q] {
 			s.Line(e.Org().X, e.Org().Y,
 				e.Dest().X, e.Dest().Y,
