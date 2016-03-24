@@ -3,7 +3,7 @@
 Manifold is a program for creating paper fold-up models.  For example,
 here is a model that can be folded up into a dodecahedron:
 
-<img style="width:80%" src="dodecahedron.svg"></img>
+![Dodecahedron](dodecahedron.png)
 
 To run manifold, first install and configure [go](http://golang.org/),
 then
