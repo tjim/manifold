@@ -17,7 +17,7 @@ perimeter of the model will be highlighted as a red arrow; this is
 called the *cursor*.  The cursor indicates where the next polygon will
 be added to the model.  You can move the cursor forward and backward
 along the perimeter of the model using the `f` and `b` keys.  Reverse
-the direction of the curse with `r`.  Add a tab (for gluing the edges
+the direction of the cursor with `r`.  Add a tab (for gluing the edges
 of the model together) with `t`.  You can start fresh by hitting `z`.
 
 Once you are satisfied with the model, save it to the file `hello.svg`
