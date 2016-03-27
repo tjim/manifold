@@ -319,6 +319,11 @@ function keyHandler(event) {
 		e.preventDefault();
 		return false;
 	}
+	if (e.keyCode == 85) { // u
+                compile("u");
+		e.preventDefault();
+		return false;
+	}
 	if (e.keyCode == 86) { // v
                 compile("v");
 		e.preventDefault();
@@ -360,7 +365,7 @@ function compileUpdate() {
 </script>
 </head>
 <body onload='compile("z")' onkeydown="keyHandler(event);">
-<div id="commands">3&ndash;9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, z: zero, m: maximize toggle</div>
+<div id="commands">3&ndash;9: polygon, f: forward, b: back, r: reverse, s: save, t: tab, u: undo, z: zero, m: maximize toggle</div>
 <div id="errors"></div>
 <div id="output" align="center"></div>
 </body>
@@ -372,6 +377,7 @@ var reversed = false // whether arrow on current edge is draw source->target or 
 var internal = make(map[*QuadEdge]bool)
 var tabEdge = make(map[*QuadEdge]bool)
 var maximize = false
+var history = new(bytes.Buffer)
 
 func attachAndMove(e1 *Edge) {
 	if e0 == nil {
@@ -427,13 +433,7 @@ func forwardSkipTabs(e *Edge) *Edge {
 	return e1
 }
 
-func Compile(w http.ResponseWriter, req *http.Request) {
-	cmd, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		w.WriteHeader(404)
-		w.Write([]byte("Error"))
-		return
-	}
+func command(cmd string) error {
 	switch string(cmd) {
 	case "3":
 		attachAndMove(Ngon(3, documentPolygonSide))
@@ -464,19 +464,49 @@ func Compile(w http.ResponseWriter, req *http.Request) {
 		}
 		out := draw(&options{false, false})
 		file.Write(out)
+		return nil // don't add "s" to command history
 	case "t":
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
 			attachAndMove(tab(e0))
 		}
+	case "u":
+		commands := history.String()
+		if len(commands) == 0 {
+			return nil // nothing to undo
+		}
+		// undo last command by replaying all commands...
+		commands = commands[:len(commands)-1] // ... except last command ...
+		command("z")                          // ... starting from zero state.
+		for _, cmd := range commands {
+			command(string(cmd))
+		}
+		return nil // don't add "u" to command history
 	case "z":
 		e0 = nil
 		internal = make(map[*QuadEdge]bool)
 		tabEdge = make(map[*QuadEdge]bool)
 		reversed = false
 		maximize = false
+		history = new(bytes.Buffer)
+		return nil // don't add "z" to (now empty) command history
 	default:
+		return fmt.Errorf("Unknown command") // don't add errors to command history
+	}
+	fmt.Fprintf(history, "%s", cmd) // NB cmd is a single character
+	return nil
+}
+
+func Compile(w http.ResponseWriter, req *http.Request) {
+	cmd, err := ioutil.ReadAll(req.Body)
+	if err != nil {
 		w.WriteHeader(404)
-		w.Write([]byte("Unknown command"))
+		w.Write([]byte(err.Error()))
+		return
+	}
+	err = command(string(cmd))
+	if err != nil {
+		w.WriteHeader(404)
+		w.Write([]byte(err.Error()))
 		return
 	}
 	out := draw(nil)
