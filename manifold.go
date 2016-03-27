@@ -450,8 +450,14 @@ func command(cmd string) error {
 	case "9":
 		attachAndMove(Ngon(9, documentPolygonSide))
 	case "b":
+		if e0 == nil {
+			return nil
+		}
 		e0 = backwardSkipTabs(e0)
 	case "f":
+		if e0 == nil {
+			return nil
+		}
 		e0 = forwardSkipTabs(e0)
 	case "m":
 		maximize = !maximize
@@ -466,6 +472,9 @@ func command(cmd string) error {
 		file.Write(out)
 		return nil // don't add "s" to command history
 	case "t":
+		if e0 == nil {
+			return nil
+		}
 		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
 			attachAndMove(tab(e0))
 		}
