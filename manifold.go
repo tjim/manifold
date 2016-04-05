@@ -135,6 +135,10 @@ func tab0(pts []*Point2D) *Edge {
 	return p
 }
 
+func traySide() *Edge {
+	return Polygon([]*Point2D{{0,0},{100,0},{110,30},{-10,30}})
+}
+
 func tab(e *Edge) *Edge { // a tab that pays attention to narrow angles
 	epsilon := 1e-10 // a bit bigger than zero to allow for inaccuracy in calculating angles
 	cwAngle := 45.0
@@ -490,6 +494,13 @@ func command(cmd string) error {
 			command(string(cmd))
 		}
 		return nil // don't add "u" to command history
+	case "v":
+		if e0 == nil {
+			return nil
+		}
+		if !tabEdge[e0.Q] { // e0 can be a tab edge if entire perimeter is tabs; don't attach a tab to a tab
+			attachAndMove(traySide())
+		}
 	case "z":
 		e0 = nil
 		internal = make(map[*QuadEdge]bool)
