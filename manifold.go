@@ -136,7 +136,7 @@ func tab0(pts []*Point2D) *Edge {
 }
 
 func traySide() *Edge {
-	return Polygon([]*Point2D{{0,0},{100,0},{110,30},{-10,30}})
+	return Polygon([]*Point2D{{0, 0}, {100, 0}, {110, 30}, {-10, 30}})
 }
 
 func tab(e *Edge) *Edge { // a tab that pays attention to narrow angles
@@ -546,6 +546,75 @@ var documentHeight = 850.0
 var documentMargin = 25.0
 var documentPolygonSide = 100.0
 
+// convex hull, assuming e0 is an edge on the perimeter of the polygon in ccw orientation
+// TODO: use this to find the best fit on the paper
+func convexHull() *Edge {
+	if e0 == nil {
+		return nil
+	}
+	// make a copy of the perimeter
+	n := 1 // n will be the number of points on the perimeter
+	for ePath := ccwPerimeter(e0); *ePath != *e0; ePath = ccwPerimeter(ePath) {
+		n++
+	}
+	pts := make([]*Point2D, n)
+	pts[0] = e0.Org()
+	i := 1
+	for ePath := ccwPerimeter(e0); *ePath != *e0; ePath = ccwPerimeter(ePath) {
+		pts[i] = ePath.Org()
+		i++
+	}
+	hull := Polygon(pts)
+	// function to compute the ccw angle between an edge and its successor,
+	// if > Pi then convex else concave
+	angle := func(e *Edge) float64 {
+		eAngle := edgeRadians(e.Sym())
+		if eAngle < 0 {
+			eAngle += 2 * math.Pi
+		}
+		// eAngle is radians to e.Sym() from positive X axis in range [0, 2*PI)
+		n := ccwPerimeter(e) // next
+		nAngle := edgeRadians(n)
+		if nAngle < 0 {
+			nAngle += 2 * math.Pi
+		}
+		// nAngle is radians to n from positive X axis in range [0, 2*PI)
+		a := nAngle - eAngle
+		if a < 0 {
+			a += 2 * math.Pi
+		}
+		// a is angle between n and e in range [0, 2*PI)
+		return a
+	}
+	// Look at all angles around the perimeter and delete any that are concave
+	e := hull
+	for {
+		if angle(e) > math.Pi { // convex angle
+			e = ccwPerimeter(e)
+			if *e == *hull {
+				break
+			}
+		} else {
+			// concave angle, so delete the point e.Dest()
+			e2 := ccwPerimeter(e)
+			e3 := ccwPerimeter(e2)
+			//
+			// *--e-->x--e2-->*--e3-->*
+			//
+			// we want to delete x (and e2)
+			Splice(e.Sym(), e2)
+			Splice(e2.Sym(), e3)
+			Splice(e.Sym(), e3)
+			e.SetDest(e3.Org())
+			//
+			// *--e---------->*--e3-->*
+			//
+			hull = e // in case hull was e2 to start with
+		}
+	}
+	return hull
+}
+
 func draw(opt *options) []byte {
 	printBorder, printCursor := true, true
 	if opt != nil {
@@ -596,6 +665,17 @@ func draw(opt *options) []byte {
 		fmt.Fprintf(pathbuf, "L %f %f", ePath.Dest().X, ePath.Dest().Y)
 	}
 	s.Path(string(pathbuf.Bytes()), "stroke:#000;stroke-width:1;fill:none")
+
+	if debug {
+		// Draw the convex hull
+		pathbuf.Reset()
+		hull := convexHull()
+		fmt.Fprintf(pathbuf, "M %f %f %f %f", hull.Org().X, hull.Org().Y, hull.Dest().X, hull.Dest().Y)
+		for ePath := ccwPerimeter(hull); *ePath != *hull; ePath = ccwPerimeter(ePath) {
+			fmt.Fprintf(pathbuf, "L %f %f", ePath.Dest().X, ePath.Dest().Y)
+		}
+		s.Path(string(pathbuf.Bytes()), "stroke:#000;stroke-width:3;fill:none")
+	}
 
 	// Draw interior edges and the cursor
 	for i, e := range e0.Edges() {
